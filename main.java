@@ -56,6 +56,7 @@ public class main {
 		try {
 			String input = readFile(file);
 			System.out.println(input);
+			input = input.toLowerCase();
 			Pattern pt = Pattern.compile("[^a-zA-Z0-9 ]");
 			Matcher match = pt.matcher(input);
 			while (match.find()) {
@@ -65,6 +66,7 @@ public class main {
 			System.out.println(input);
 			String output = removeStopWords(input);
 			System.out.println(output); // remove stopwords
+			
 			
 		} catch (Exception e) {
 			System.out.println(e);
