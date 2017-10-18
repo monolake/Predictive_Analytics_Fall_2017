@@ -54,7 +54,7 @@ public class main {
 		}
 		return result;
 	}
-	public static List<String> lemmatize(String input, LinkedHashMap<String, String> ner_tag) {
+	public static List<String> lemmatize(String input, List<String> ner_tag) {
 		
         Properties props = new Properties();
         props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner");
@@ -74,123 +74,190 @@ public class main {
 	       // a CoreLabel is a CoreMap with additional token-specific methods
 	       for (CoreLabel token: sentence.get(TokensAnnotation.class)) {
 	         lemmas.add(token.get(LemmaAnnotation.class));
-	         ner_tag.put(token.get(TextAnnotation.class), token.get(NamedEntityTagAnnotation.class));
+	         ner_tag.add(token.get(NamedEntityTagAnnotation.class));
 	       }
 	     }		
 	     return lemmas;
 	}
 	
+	public static LinkedHashMap<String, Integer> selfgetTF(List<String> lemma) {
+		
+		// token - number of times it appears
+		LinkedHashMap<String, Integer> token_mp = new LinkedHashMap<String, Integer>();
+		
+		List<String> ngrams_level2 = new LinkedList<String> (StringUtils.getNgrams(lemma, 2, 2));
+		for (String temp : ngrams_level2) {
+			token_mp.put(temp,  Collections.frequency(ngrams_level2, temp));
+		}
+
+		List<String> ngrams_level3 = new LinkedList<String> (StringUtils.getNgrams(lemma, 3, 3));
+		for (String temp : ngrams_level3) {
+			token_mp.put(temp,  Collections.frequency(ngrams_level3, temp));
+		}
+		
+/*		for (String key : token_mp.keySet()) {
+			if (token_mp.get(key) > 3)
+				System.out.println(key);
+		}*/
+		LinkedHashMap<String, Integer> token_mp_final = new LinkedHashMap<String, Integer>();
+		
+		List<String> ngrams_level1 = new LinkedList<String> (StringUtils.getNgrams(lemma, 1, 1));
+		for (String temp : ngrams_level1) {
+			int appearance = 0;
+			for (String key : token_mp.keySet()) {
+				if (token_mp.get(key) > 3 && key.contains(temp)) {
+					appearance += token_mp.get(key);
+				}
+			}
+			token_mp_final.put(temp, Collections.frequency(ngrams_level1, temp) - appearance);
+		}		
+		
+		for (String key : token_mp.keySet()) {
+			if (token_mp.get(key) > 3) {
+				token_mp_final.put(key, token_mp.get(key));
+				//System.out.println(key);
+			}
+		}
+		
+		double count = 0;
+		for (String key : token_mp_final.keySet()) {
+			count += token_mp_final.get(key);
+		}
+		
+		for (String key : token_mp_final.keySet()) {
+			System.out.print(key + " : " + token_mp_final.get(key) / count + "\n");
+		}
+		
+		System.out.println();
+		return token_mp_final;
+			
+	}
 	
+	public static int computeTF(String token, String file) {
+		//String input = readFile(files.get(i));
+		return 1;
+	}
 	public static void main(String []args) {
 		System.out.println("Hello World");
 		final String dir = System.getProperty("user.dir");
 		//System.out.println("current dir = " + dir);
-		String file = dir + "/C1/article01.txt";
+		LinkedList<String> queue = new LinkedList<String> ();
+		
+		File f = new File(dir + "/" + args[0]);
+		System.out.println(f.listFiles().length);
+		
 		//System.out.println(file);
 		
 		try {
-			String input = readFile(file);
-			System.out.println(input);
-			input = input.toLowerCase();
-			Pattern pt = Pattern.compile("[^a-zA-Z0-9 ]");
-			Matcher match = pt.matcher(input);
-			while (match.find()) {
-				String s = match.group();
-				input = input.replaceAll("\\" + s, "");
+			// 1. generate terms of all documents
+			List<String> tokens = new LinkedList<String>();
+			List<String> files = new LinkedList<String>();
+			LinkedList<LinkedHashMap<String, Integer>> TF_list = new LinkedList<LinkedHashMap<String, Integer>>();
+			for (File path : f.listFiles()) {
+				System.out.println(dir + "/" + args[0] + "/" + path.getName());
+				String file = new String(path.getName());
+				files.add(file);
 			}
-			System.out.println(input);
-			String output = removeStopWords(input);
-			System.out.println(output); // remove stopwords
-			
-
-			
-			
-			LinkedHashMap<String, String> ner_tag = new LinkedHashMap<String, String> ();
-			List<String> lemma = lemmatize(output, ner_tag);
-			System.out.println(lemma); // lemmatizer 
-			System.out.println(ner_tag);
-			
-			// create a list of tokens with uniqueness
-			LinkedHashMap<String, Integer> token_mp = new LinkedHashMap<String, Integer>();
-			int count = 0;
-			for (int i = 0; i < lemma.size(); i++) {
-				if (token_mp.containsKey(lemma.get(i)))
-					continue;
-				token_mp.put(lemma.get(i), count++);
-			}
-			
-			int [][] sim_mat = new int[count][count];
-			for (int i = 0; i < count; i++) {
-				for (int j = 0; j < count; j++) {
-					sim_mat[i][j] = 0;
+			for (int i = 0; i < f.listFiles().length; i++) {
+				String input = readFile(dir + "/" + args[0] + "/" + files.get(i));
+				System.out.println(input);
+				input = input.toLowerCase();
+				Pattern pt = Pattern.compile("[^a-zA-Z0-9 ]");
+				Matcher match = pt.matcher(input);
+				while (match.find()) {
+					String s = match.group();
+					input = input.replaceAll("\\" + s, "");
 				}
-			}
-			List<String> ngrams = new LinkedList<String> (StringUtils.getNgrams(lemma, 2, 2));
-			System.out.println(ngrams);
-			System.out.println("The dimension is : " + count);
-			for (String temp : ngrams) {
-				String[] words = temp.split("\\s+");
-				int idx = token_mp.get(words[0]);
-				int idy = token_mp.get(words[1]);
-				sim_mat[idx][idy]++;
-				// System.out.print(words[0] + " " + words[1] + " " + idx + " " + idy);
-				//return;
+				//System.out.println(input);
+				String output = removeStopWords(input);
+				//System.out.println(output); // remove stopwords
+				List<String> ner_tag = new LinkedList<String> ();
+				List<String> lemma = lemmatize(output, ner_tag);
+				System.out.println(lemma); // lemmatizer 
+				System.out.println(ner_tag);
 				
-			}
-			
-			for (String str : token_mp.keySet()) {
-				System.out.print(str + token_mp.get(str) + " ");
-			}
-			System.out.println();
-			
-			int max = Integer.MIN_VALUE;
-			
-			double sums = 0;
-			List<String> res = new LinkedList<String>();
-			
-			for (int i = 0; i < count; i++) {
-				for (int j = 0; j < count; j++) {
-					if (sim_mat[i][j] > 3) {
-						String temp = new String();
-						for (String o : token_mp.keySet()) {
-							if (token_mp.get(o).equals(i)) {
-								temp = temp + o;
-								temp = temp + " ";
-							}
-						}
-						for (String o : token_mp.keySet()) {
-							if (token_mp.get(o).equals(j)) {
-								temp = temp + o;
-							}
-						}		
-						res.add(temp);
+				List<String> after_ner = new LinkedList<String>();
+				
+				int ii = 0;
+				while (ii < lemma.size()) {
+					if (ner_tag.get(ii).compareTo("O") == 0) {
+						after_ner.add(lemma.get(ii));
+						ii++;
 					}
-					// System.out.print(sim_mat[i][j] + " ");
+					else {
+						String temp = new String();
+						temp = lemma.get(ii);
+						int j = ii+1;
+						while (j < lemma.size() && ner_tag.get(j).compareTo(ner_tag.get(ii)) == 0) {
+							temp += (" " + lemma.get(j));
+							j += 1;
+						}
+						after_ner.add(temp);
+						ii = j;
+					}					
 				}
-				// System.out.println();
+				System.out.println(after_ner);
+				LinkedHashMap<String, Integer> TF = selfgetTF(after_ner);
+				TF_list.add(TF);
+				for (String key : TF.keySet()) {
+					if (tokens.contains(key))
+						continue;
+					tokens.add(key);
+				}
 			}
 			
-			// System.out.println("max " + max);
+			// 2. count token appearance in documents
+			LinkedList<Integer> num_appeared = new LinkedList<Integer>();
 			
-			List<String> token = new LinkedList<String>();
-			int i = 0;
-			while (i < lemma.size() - 1) {
-				String target = lemma.get(i) + " " + lemma.get(i+1);
-				if (res.contains(target)) {
-					if (!token.contains(target))
-						token.add(target);
-					i += 2;
+			int m = tokens.size();
+			int n = f.listFiles().length;
+			for (int i = 0; i < m; i++) {
+				num_appeared.add(0);
+			}
+			for (int i = 0; i < m; i++) {
+				int count = 0;
+				for (int j = 0; j < n; j++) {
+					LinkedHashMap<String, Integer> doc = TF_list.get(j);
+					if (doc.containsKey(tokens.get(i))) {
+						count++;
+					}
 				}
-				else {
-					if (!token.contains(lemma.get(i)))
-						token.add(lemma.get(i));
-					i += 1;
+				num_appeared.set(i, count);
+			}
+
+			// 2. generate TFIDF matrix
+			double [][] TFIDF = new double [m][n];
+			for (int i = 0; i < m; i++) {
+				for (int j = 0; j < n; j++) {
+					TFIDF[i][j] = 0;
+					LinkedHashMap<String, Integer> doc = TF_list.get(j);
+					if (doc.containsKey(tokens.get(i))) {
+						TFIDF[i][j] = (double) doc.get(tokens.get(i)) * Math.log((double) n / (double) num_appeared.get(i));
+					}
 				}
 			}
 			
-			System.out.println(token);
-			
+			FileWriter fos = new FileWriter(args[1]);
+			PrintWriter dos = new PrintWriter(fos);
+			String header = new String();
+			header += "\t";
+			for (int i = 0; i < n; i++) {
+				header += files.get(i) + "\t";
+			}
+			dos.println(header);
+			for (int i = 0; i < m; i++) {
+				//System.out.print(tokens.get(i) + "\t");
+				dos.print(tokens.get(i) + ",");
+				for (int j = 0; j < n; j++) {
+					//System.out.print(TFIDF[i][j] + "\t");
+					dos.print(TFIDF[i][j] + "\t");
+				}
+				//System.out.println();
+				dos.println();
+			}
 			System.out.println("finish all work");
+			dos.close();
+			fos.close();
 			
 		} catch (Exception e) {
 			System.out.println(e);
