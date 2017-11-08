@@ -1,5 +1,7 @@
 package PAHW1;
 import java.io.*;
+import java.nio.file.Files;
+
 import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.LemmaAnnotation;
@@ -80,7 +82,7 @@ public class main {
 	     return lemmas;
 	}
 	
-	public static LinkedHashMap<String, Integer> selfgetTF(List<String> lemma) {
+	public static LinkedHashMap<String, Double> selfgetTF(List<String> lemma) {
 		
 		// token - number of times it appears
 		LinkedHashMap<String, Integer> token_mp = new LinkedHashMap<String, Integer>();
@@ -123,13 +125,14 @@ public class main {
 		for (String key : token_mp_final.keySet()) {
 			count += token_mp_final.get(key);
 		}
-		
+		LinkedHashMap<String, Double> res = new LinkedHashMap<String, Double>();
 		for (String key : token_mp_final.keySet()) {
 			System.out.print(key + " : " + token_mp_final.get(key) / count + "\n");
+			res.put(key, (double) token_mp_final.get(key) / count);
 		}
 		
 		System.out.println();
-		return token_mp_final;
+		return res;
 			
 	}
 	
@@ -140,26 +143,35 @@ public class main {
 	public static void main(String []args) {
 		System.out.println("Hello World");
 		final String dir = System.getProperty("user.dir");
-		//System.out.println("current dir = " + dir);
+		System.out.println("current dir = " + dir);
 		LinkedList<String> queue = new LinkedList<String> ();
 		
-		File f = new File(dir + "/" + args[0]);
-		System.out.println(f.listFiles().length);
+		// removed
+		//File f = new File(dir + "/" + args[0]);
+		//System.out.println(f.listFiles().length);
 		
-		//System.out.println(file);
-		
+
+			
 		try {
+		int num_doc_corpus = 0;
+		LinkedList<LinkedHashMap<String, Double>> TF_list_corpus = new LinkedList<LinkedHashMap<String, Double>>();
+		List<String> tokens_corpus = new LinkedList<String>();
+		for (int index = 1; index < 15; index++) {
+			File f = new File(dir + "/DataSet-corpus/" + "C" + Integer.toString(index));
+			System.out.println(dir + "/DataSet-corpus/" + "C" + Integer.toString(index));
+			System.out.println(f.listFiles().length);
+			num_doc_corpus += f.listFiles().length;
 			// 1. generate terms of all documents
 			List<String> tokens = new LinkedList<String>();
 			List<String> files = new LinkedList<String>();
-			LinkedList<LinkedHashMap<String, Integer>> TF_list = new LinkedList<LinkedHashMap<String, Integer>>();
+			LinkedList<LinkedHashMap<String, Double>> TF_list = new LinkedList<LinkedHashMap<String, Double>>();
 			for (File path : f.listFiles()) {
-				System.out.println(dir + "/" + args[0] + "/" + path.getName());
+				System.out.println(dir + "/DataSet-corpus/" + "C" + Integer.toString(index) + "/" + path.getName());
 				String file = new String(path.getName());
 				files.add(file);
 			}
 			for (int i = 0; i < f.listFiles().length; i++) {
-				String input = readFile(dir + "/" + args[0] + "/" + files.get(i));
+				String input = readFile(dir + "/DataSet-corpus/" + "C" + Integer.toString(index) + "/" + files.get(i));
 				System.out.println(input);
 				input = input.toLowerCase();
 				Pattern pt = Pattern.compile("[^a-zA-Z0-9 ]");
@@ -197,73 +209,86 @@ public class main {
 					}					
 				}
 				System.out.println(after_ner);
-				LinkedHashMap<String, Integer> TF = selfgetTF(after_ner);
+				LinkedHashMap<String, Double> TF = selfgetTF(after_ner);
 				TF_list.add(TF);
+				TF_list_corpus.add(TF);
 				for (String key : TF.keySet()) {
 					if (tokens.contains(key))
 						continue;
 					tokens.add(key);
 				}
-			}
-			
-			// 2. count token appearance in documents
-			LinkedList<Integer> num_appeared = new LinkedList<Integer>();
-			
-			int m = tokens.size();
-			int n = f.listFiles().length;
-			for (int i = 0; i < m; i++) {
-				num_appeared.add(0);
-			}
-			for (int i = 0; i < m; i++) {
-				int count = 0;
-				for (int j = 0; j < n; j++) {
-					LinkedHashMap<String, Integer> doc = TF_list.get(j);
-					if (doc.containsKey(tokens.get(i))) {
-						count++;
-					}
+				for (String key: TF.keySet()) {
+					if (tokens_corpus.contains(key))
+						continue;
+					tokens_corpus.add(key);
 				}
-				num_appeared.set(i, count);
 			}
+			
+		// 2. count token appearance in documents
+			
+		}
+		System.out.println(num_doc_corpus);
+		// second part, compute global TF-IDF matrix using tokens_corpus and TF_list_corpus
+		// tokens_corpus records all tokens;
+		// TF_list_corpus records word freq in each doc in the corpus.
+		LinkedList<Integer> num_appeared = new LinkedList<Integer>();
 
-			// 2. generate TFIDF matrix
-			double [][] TFIDF = new double [m][n];
-			for (int i = 0; i < m; i++) {
-				for (int j = 0; j < n; j++) {
-					TFIDF[i][j] = 0;
-					LinkedHashMap<String, Integer> doc = TF_list.get(j);
-					if (doc.containsKey(tokens.get(i))) {
-						TFIDF[i][j] = (double) doc.get(tokens.get(i)) * Math.log((double) n / (double) num_appeared.get(i));
-					}
+		int m = tokens_corpus.size();
+		for (int i = 0; i < m; i++) {
+			num_appeared.add(0);
+		}
+		int n = num_doc_corpus;
+		for (int i = 0; i < m; i++) {
+			int count = 0;
+			for (int j = 0; j < n; j++) {
+				LinkedHashMap<String, Double> doc = TF_list_corpus.get(j);
+				if (doc.containsKey(tokens_corpus.get(i))) {
+					count++; // count how many documents in the corpus has this word appeared
 				}
 			}
-			
-			FileWriter fos = new FileWriter(args[1]);
-			PrintWriter dos = new PrintWriter(fos);
-			String header = new String();
-			header += "\t";
-			for (int i = 0; i < n; i++) {
-				header += files.get(i) + "\t";
-			}
-			dos.println(header);
-			for (int i = 0; i < m; i++) {
-				//System.out.print(tokens.get(i) + "\t");
-				dos.print(tokens.get(i) + ",");
-				for (int j = 0; j < n; j++) {
-					//System.out.print(TFIDF[i][j] + "\t");
-					dos.print(TFIDF[i][j] + "\t");
+			num_appeared.set(i, count);
+		}
+
+		// 2. generate TFIDF matrix
+		double [][] TFIDF = new double [m][n];
+		for (int i = 0; i < m; i++) {
+			for (int j = 0; j < n; j++) {
+				TFIDF[i][j] = 0;
+				LinkedHashMap<String, Double> doc = TF_list_corpus.get(j);
+				if (doc.containsKey(tokens_corpus.get(i))) {
+					TFIDF[i][j] = (double) doc.get(tokens_corpus.get(i)) * Math.log((double) num_doc_corpus / (double) num_appeared.get(i));
 				}
-				//System.out.println();
-				dos.println();
 			}
-			System.out.println("finish all work");
-			dos.close();
-			fos.close();
-			
+		}
+					
+		FileWriter fos = new FileWriter(dir + "/DataSet-corpus/" + "TFIDF-" + "TF-IDF.csv");
+		PrintWriter dos = new PrintWriter(fos);
+		String header = new String();
+		header += "\t";
+		for (int i = 0; i < n; i++) {
+			//header += files.get(i) + "\t";
+			header += "article" + Integer.toString(i+1) + "\t";
+		}
+		dos.println(header);
+		
+		for (int i = 0; i < m; i++) {
+			//System.out.print(tokens.get(i) + "\t");
+			dos.print(tokens_corpus.get(i) + ",");
+			for (int j = 0; j < n; j++) {
+				//System.out.print(TFIDF[i][j] + "\t");
+				dos.print(TFIDF[i][j] + "\t");
+			}
+			//System.out.println();
+			dos.println();
+		}
+		System.out.println("finish all work");
+		dos.close();
+		fos.close();		
 		} catch (Exception e) {
 			System.out.println(e);
 		}
 		
-		
+
 	}
 }
 
